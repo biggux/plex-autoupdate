@@ -28,6 +28,17 @@ for cmd in curl python3 dpkg systemctl; do
     fi
     echo "  OK: $cmd"
 done
+
+# Check for cron
+if ! command -v crontab &>/dev/null; then
+    echo "  WARNING: cron is not installed. Installing now..."
+    apt-get update -qq && apt-get install -y -qq cron
+    systemctl enable cron
+    systemctl start cron
+    echo "  OK: cron installed and started"
+else
+    echo "  OK: cron"
+fi
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -98,6 +109,55 @@ fi
 echo "  Set to: $USER_MAX_WAIT minutes"
 echo ""
 
+# Schedule
+echo "--- Update Schedule ---"
+echo "  How often should the updater check for new versions?"
+echo "  1) Daily at 2:00 AM        (recommended)"
+echo "  2) Twice daily (2 AM & 2 PM)"
+echo "  3) Every 6 hours"
+echo "  4) Hourly"
+echo "  5) Weekly (Sunday at 2:00 AM)"
+echo "  6) Custom cron expression"
+read -rp "Select schedule [1-6] (default: 1): " SCHEDULE_CHOICE
+
+CRON_SCHEDULE=""
+SCHEDULE_DESC=""
+case "$SCHEDULE_CHOICE" in
+    2)
+        CRON_SCHEDULE="0 2,14 * * *"
+        SCHEDULE_DESC="Twice daily (2:00 AM & 2:00 PM)"
+        ;;
+    3)
+        CRON_SCHEDULE="0 */6 * * *"
+        SCHEDULE_DESC="Every 6 hours"
+        ;;
+    4)
+        CRON_SCHEDULE="0 * * * *"
+        SCHEDULE_DESC="Hourly"
+        ;;
+    5)
+        CRON_SCHEDULE="0 2 * * 0"
+        SCHEDULE_DESC="Weekly (Sunday at 2:00 AM)"
+        ;;
+    6)
+        read -rp "  Enter cron expression (e.g., '30 3 * * *' for 3:30 AM daily): " CUSTOM_CRON
+        if [[ -z "$CUSTOM_CRON" ]]; then
+            echo "  Empty expression. Using default: daily at 2:00 AM"
+            CRON_SCHEDULE="0 2 * * *"
+            SCHEDULE_DESC="Daily at 2:00 AM"
+        else
+            CRON_SCHEDULE="$CUSTOM_CRON"
+            SCHEDULE_DESC="Custom ($CUSTOM_CRON)"
+        fi
+        ;;
+    *)
+        CRON_SCHEDULE="0 2 * * *"
+        SCHEDULE_DESC="Daily at 2:00 AM"
+        ;;
+esac
+echo "  Selected: $SCHEDULE_DESC"
+echo ""
+
 # ---------------------------------------------------------------------------
 # Install script
 # ---------------------------------------------------------------------------
@@ -110,6 +170,7 @@ echo "  OK: Script installed"
 # ---------------------------------------------------------------------------
 # Generate config
 # ---------------------------------------------------------------------------
+WRITE_CONFIG=""
 if [[ -f "$CONFIG_FILE" ]]; then
     echo "  WARNING: Config already exists at $CONFIG_FILE"
     read -rp "  Overwrite? [y/N]: " OVERWRITE
@@ -146,7 +207,7 @@ CHECK_INTERVAL_SECONDS=120
 # Email notifications
 EMAIL_ENABLED="$USER_EMAIL_ENABLED"
 EMAIL_TO="$USER_EMAIL_TO"
-EMAIL_FROM="plex-updater@$(hostname -f 2>/dev/null || echo 'localhost')"
+EMAIL_FROM="plex-updater@\$(hostname -f 2>/dev/null || echo 'localhost')"
 EMAIL_SUBJECT_PREFIX="[Plex Updater]"
 
 # Paths
@@ -168,13 +229,16 @@ echo ""
 # Set up cron
 # ---------------------------------------------------------------------------
 echo "Setting up cron job..."
-CRON_LINE="0 */6 * * * ${INSTALL_DIR}/plex-autoupdate.sh >> /var/log/plex-autoupdate.log 2>&1"
+CRON_LINE="${CRON_SCHEDULE} ${INSTALL_DIR}/plex-autoupdate.sh >> /var/log/plex-autoupdate.log 2>&1"
 
 if crontab -l 2>/dev/null | grep -q "plex-autoupdate"; then
-    echo "  WARNING: Cron job already exists. Skipping."
+    echo "  Existing cron job found. Replacing with new schedule..."
+    # Remove old entry and add new one
+    (crontab -l 2>/dev/null | grep -v "plex-autoupdate"; echo "$CRON_LINE") | crontab -
+    echo "  OK: Cron job updated ($SCHEDULE_DESC)"
 else
     (crontab -l 2>/dev/null || true; echo "$CRON_LINE") | crontab -
-    echo "  OK: Cron job added (runs every 6 hours)"
+    echo "  OK: Cron job added ($SCHEDULE_DESC)"
 fi
 
 echo ""
@@ -184,10 +248,11 @@ echo "Summary:"
 echo "  Channel:       $USER_CHANNEL"
 echo "  Email:         ${USER_EMAIL_ENABLED} ${USER_EMAIL_TO:+($USER_EMAIL_TO)}"
 echo "  Max wait:      ${USER_MAX_WAIT} minutes"
+echo "  Schedule:      $SCHEDULE_DESC"
 echo "  Config:        $CONFIG_FILE"
 echo "  Script:        ${INSTALL_DIR}/plex-autoupdate.sh"
 echo "  Logs:          /var/log/plex-autoupdate.log"
-echo "  Cron:          every 6 hours (edit with 'crontab -e')"
 echo ""
-echo "To test now:  ${INSTALL_DIR}/plex-autoupdate.sh"
-echo "To reconfigure: edit $CONFIG_FILE"
+echo "To test now:     sudo ${INSTALL_DIR}/plex-autoupdate.sh"
+echo "To reconfigure:  edit $CONFIG_FILE"
+echo "To change schedule: sudo crontab -e"

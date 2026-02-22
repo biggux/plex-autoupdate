@@ -9,6 +9,7 @@ Works with both **Plex Pass beta** builds and **public stable** releases on Ubun
 - **Channel selection** — choose between Plex Pass beta or public stable releases
 - **Stream-aware** — checks for active sessions before updating; waits for viewers to finish
 - **Configurable timeout** — set how long to wait for streams before giving up
+- **Flexible scheduling** — daily, twice daily, every 6 hours, hourly, weekly, or custom cron
 - **Safe rollback** — restarts the old version if installation fails
 - **Lock file** — prevents overlapping runs when triggered by cron
 - **Email notifications** — optional alerts for updates, errors, and completions
@@ -52,7 +53,7 @@ Works with both **Plex Pass beta** builds and **public stable** releases on Ubun
 
 - Ubuntu or Debian-based Linux
 - Plex Media Server installed via `.deb`
-- `curl`, `python3`, `dpkg`, `systemctl`
+- `curl`, `python3`, `dpkg`, `systemctl`, `cron`
 - A [Plex authentication token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
 - *(Optional)* `mailutils` or `sendmail` for email notifications
 
@@ -73,8 +74,9 @@ The installer will prompt you for:
 2. **Update channel** — public (stable) or plexpass (beta)
 3. **Email notifications** — enable/disable and set recipient
 4. **Wait timeout** — how long to wait for active streams
+5. **Schedule** — how often to check for updates
 
-It installs the script to `/opt/plex-autoupdate/`, writes your config to `/etc/plex-autoupdate.conf`, and sets up a cron job to run every 6 hours.
+It installs the script to `/opt/plex-autoupdate/`, writes your config to `/etc/plex-autoupdate.conf`, and sets up the cron job with your chosen schedule.
 
 ## Manual Setup
 
@@ -93,9 +95,9 @@ sudo chmod 600 /etc/plex-autoupdate.conf
 # Edit config with your values
 sudo nano /etc/plex-autoupdate.conf
 
-# Add to cron (runs every 6 hours)
+# Add to cron (example: daily at 2 AM)
 sudo crontab -e
-# Add: 0 */6 * * * /opt/plex-autoupdate/plex-autoupdate.sh >> /var/log/plex-autoupdate.log 2>&1
+# Add: 0 2 * * * /opt/plex-autoupdate/plex-autoupdate.sh >> /var/log/plex-autoupdate.log 2>&1
 ```
 
 ## Configuration
@@ -114,6 +116,27 @@ All settings live in `/etc/plex-autoupdate.conf`:
 | `EMAIL_FROM` | auto-detected | Sender address |
 | `EMAIL_SUBJECT_PREFIX` | `[Plex Updater]` | Email subject prefix |
 | `LOG_FILE` | `/var/log/plex-autoupdate.log` | Log file path |
+
+## Schedule Options
+
+The installer offers these preset schedules:
+
+| Option | Cron Expression | Description |
+|---|---|---|
+| Daily (default) | `0 2 * * *` | Once per day at 2:00 AM |
+| Twice daily | `0 2,14 * * *` | At 2:00 AM and 2:00 PM |
+| Every 6 hours | `0 */6 * * *` | Four times per day |
+| Hourly | `0 * * * *` | Every hour on the hour |
+| Weekly | `0 2 * * 0` | Sunday at 2:00 AM |
+| Custom | *(you provide)* | Any valid cron expression |
+
+To change the schedule after installation:
+
+```bash
+sudo crontab -e
+```
+
+Or re-run the installer — it will detect and replace the existing cron entry.
 
 ## Usage
 
@@ -148,18 +171,18 @@ sudo apt install mailutils
 All activity is logged to `/var/log/plex-autoupdate.log` with timestamps:
 
 ```
-[2026-02-22 03:00:01] [INFO] ===== Plex Auto-Update Check Started [Channel: Public (stable)] =====
-[2026-02-22 03:00:01] [INFO] Installed version: 1.40.0.8227
-[2026-02-22 03:00:02] [INFO] Checking Public (stable) channel for updates...
-[2026-02-22 03:00:03] [INFO] Latest Public (stable) version: 1.41.0.8451
-[2026-02-22 03:00:03] [INFO] New version available: 1.41.0.8451 (current: 1.40.0.8227)
-[2026-02-22 03:00:08] [INFO] Downloaded to: /tmp/plex-update/plexmediaserver_1.41.0.8451_amd64.deb
-[2026-02-22 03:00:08] [INFO] Active sessions: 2. Waiting... (0s / 21600s)
-[2026-02-22 03:04:08] [INFO] No active sessions. Proceeding with update.
-[2026-02-22 03:04:13] [INFO] Plex stopped.
-[2026-02-22 03:04:18] [INFO] Installation successful.
-[2026-02-22 03:04:28] [INFO] Plex is running. Version: 1.41.0.8451
-[2026-02-22 03:04:28] [INFO] ===== Update complete: 1.40.0.8227 -> 1.41.0.8451 =====
+[2026-02-22 02:00:01] [INFO] ===== Plex Auto-Update Check Started [Channel: Public (stable)] =====
+[2026-02-22 02:00:01] [INFO] Installed version: 1.40.0.8227
+[2026-02-22 02:00:02] [INFO] Checking Public (stable) channel for updates...
+[2026-02-22 02:00:03] [INFO] Latest Public (stable) version: 1.41.0.8451
+[2026-02-22 02:00:03] [INFO] New version available: 1.41.0.8451 (current: 1.40.0.8227)
+[2026-02-22 02:00:08] [INFO] Downloaded to: /tmp/plex-update/plexmediaserver_1.41.0.8451_amd64.deb
+[2026-02-22 02:00:08] [INFO] Active sessions: 2. Waiting... (0s / 21600s)
+[2026-02-22 02:04:08] [INFO] No active sessions. Proceeding with update.
+[2026-02-22 02:04:13] [INFO] Plex stopped.
+[2026-02-22 02:04:18] [INFO] Installation successful.
+[2026-02-22 02:04:28] [INFO] Plex is running. Version: 1.41.0.8451
+[2026-02-22 02:04:28] [INFO] ===== Update complete: 1.40.0.8227 -> 1.41.0.8451 =====
 ```
 
 ## License
