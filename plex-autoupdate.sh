@@ -81,7 +81,7 @@ EMAIL_ENABLED=$(echo "$EMAIL_ENABLED" | tr '[:upper:]' '[:lower:]')
 # ---------------------------------------------------------------------------
 log() {
     local level="$1"; shift
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE" >&2
 }
 
 log_info()  { log "INFO"  "$@"; }
