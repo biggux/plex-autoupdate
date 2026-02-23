@@ -6,7 +6,9 @@
 # Interactive installer for plex-backup.sh
 ###############################################################################
 
-set -euo pipefail
+set -eo pipefail
+EMAIL_TO="${EMAIL_TO:-}"
+shopt -s -o nounset 2>/dev/null || true
 
 INSTALL_DIR="/opt/plex-autoupdate"
 CONFIG_FILE="/etc/plex-backup.conf"
@@ -160,6 +162,8 @@ if [[ -f "$CONFIG_FILE" ]]; then
     echo ""
     # shellcheck source=/dev/null
     source "$CONFIG_FILE"
+    BACKUP_COMPONENTS="${BACKUP_COMPONENTS:-database preferences plugins}"
+    EMAIL_TO="${EMAIL_TO:-}"
     EXISTING_TOKEN="$PLEX_TOKEN"
     EXISTING_URL="$PLEX_URL"
     EXISTING_BACKUP_DIR="$BACKUP_DIR"
