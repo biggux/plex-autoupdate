@@ -15,6 +15,27 @@ Both tools share the same stream-aware design: they wait for active viewers to f
 * A [Plex authentication token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
 * *(Optional)* `mailutils` or `sendmail` for email notifications
 
+## 🚀 Quick Start
+
+```bash
+# Clone the repo
+git clone https://github.com/biggux/plex-autoupdate.git
+cd plex-autoupdate
+
+# Run the interactive installer
+sudo bash install.sh
+```
+
+The installer lets you choose what to set up:
+
+```
+  1) 🔄 Auto-Updater only
+  2) 💾 Backup only
+  3) 🎬 Both (recommended)
+```
+
+Shared settings like your Plex token, server URL, and email preferences are configured once and reused across both tools.
+
 ---
 
 # 🔄 Plex Auto-Updater
@@ -68,28 +89,9 @@ Works with both **Plex Pass beta** builds and **public stable** releases.
 └─────────────────────────────┘
 ```
 
-## 🚀 Quick Start (Auto-Updater)
-
-```bash
-# Clone the repo
-git clone https://github.com/biggux/plex-autoupdate.git
-cd plex-autoupdate
-
-# Run the interactive installer (as root)
-sudo bash install-plex-updater.sh
-```
-
-The installer will prompt you for:
-
-1. 🔑 Your **Plex token**
-2. 📡 **Update channel** — public (stable) or plexpass (beta)
-3. 📧 **Email notifications** — enable/disable and set recipient
-4. ⏱️ **Wait timeout** — how long to wait for active streams
-5. 📅 **Schedule** — how often to check for updates
-
-It installs the script to `/opt/plex-autoupdate/`, writes your config to `/etc/plex-autoupdate.conf`, and sets up the cron job with your chosen schedule.
-
 ## 🛠️ Manual Setup (Auto-Updater)
+
+If you prefer not to use the installer:
 
 ```bash
 # Copy files
@@ -135,7 +137,6 @@ The installer offers these preset schedules:
 | Daily (default) | `0 2 * * *` | Once per day at 2:00 AM |
 | Twice daily | `0 2,14 * * *` | At 2:00 AM and 2:00 PM |
 | Every 6 hours | `0 */6 * * *` | Four times per day |
-| Hourly | `0 * * * *` | Every hour on the hour |
 | Weekly | `0 2 * * 0` | Sunday at 2:00 AM |
 | Custom | *(you provide)* | Any valid cron expression |
 
@@ -229,24 +230,9 @@ Automated backup of Plex databases, preferences, and plugin data with stream-awa
 └─────────────────────────────┘
 ```
 
-## 🚀 Quick Start (Backup)
-
-```bash
-# From the repo directory
-sudo bash install-plex-backup.sh
-```
-
-The installer will prompt you for:
-
-1. 🔑 Your **Plex token**
-2. 📂 **Backup destination** — any local or mounted path
-3. 🧩 **Components** — database, preferences, plugins
-4. 🗑️ **Retention** — how many backups to keep
-5. 🛡️ **Shutdown behavior** — stop Plex and/or wait for streams
-6. 📧 **Email notifications** — enable/disable and set recipient
-7. 📅 **Schedule** — how often to run backups
-
 ## 🛠️ Manual Setup (Backup)
+
+If you prefer not to use the installer:
 
 ```bash
 # Copy files
