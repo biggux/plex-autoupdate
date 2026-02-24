@@ -1,20 +1,199 @@
+# 🎬 Plex Auto-Updater & Backup
+
+Two tools for automated Plex Media Server management on Ubuntu/Debian systems:
+
+- **[🔄 Auto-Updater](#-plex-auto-updater)** — Automatically checks for new Plex versions, waits for active streams to finish, then safely downloads, installs, and restarts Plex.
+- **[💾 Backup](#-plex-backup)** — Automated backup of Plex databases, preferences, and plugin data with stream-aware scheduling, configurable retention, and optional compression.
+
+Both tools share the same stream-aware design: they wait for active viewers to finish before taking action. 🍿
+
+## 📋 Requirements
+
+* Ubuntu or Debian-based Linux
+* Plex Media Server installed via `.deb`
+* `curl`, `python3`, `dpkg`, `systemctl`, `cron`
+* A [Plex authentication token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
+* *(Optional)* `mailutils` or `sendmail` for email notifications
+
 ---
 
-# Plex Backup
+# 🔄 Plex Auto-Updater
+
+Automatically checks for new Plex Media Server versions, waits for active streams to finish, then safely downloads, installs, and restarts Plex — all unattended.
+
+Works with both **Plex Pass beta** builds and **public stable** releases.
+
+## ✨ Auto-Updater Features
+
+* 📡 **Channel selection** — choose between Plex Pass beta or public stable releases
+* 👀 **Stream-aware** — checks for active sessions before updating; waits for viewers to finish
+* ⏱️ **Configurable timeout** — set how long to wait for streams before giving up
+* 📅 **Flexible scheduling** — daily, twice daily, every 6 hours, hourly, weekly, or custom cron
+* 🔙 **Safe rollback** — restarts the old version if installation fails
+* 🔒 **Lock file** — prevents overlapping runs when triggered by cron
+* 📧 **Email notifications** — optional alerts for updates, errors, and completions
+* ⚡ **Zero downtime goal** — downloads the update while streams are still active, only stops Plex when nobody is watching
+
+## 🔧 How It Works
+
+```
+┌─────────────────────────────┐
+│  Check latest version       │
+│  (plex.tv API)              │
+└─────────────┬───────────────┘
+              │
+              ▼
+        ┌───────────┐    Yes
+        │ Up to date?├─────────► Exit
+        └─────┬─────┘
+              │ No
+              ▼
+┌─────────────────────────────┐
+│  Download .deb package      │
+│  (while streams may be      │
+│   still active)             │
+└─────────────┬───────────────┘
+              │
+              ▼
+┌─────────────────────────────┐
+│  Anyone watching?           │
+│  ├─ Yes → wait & re-check  │
+│  │        (every 2 min)     │
+│  └─ No  → continue         │
+└─────────────┬───────────────┘
+              │
+              ▼
+┌─────────────────────────────┐
+│  Stop → Install → Start    │
+└─────────────────────────────┘
+```
+
+## 🚀 Quick Start (Auto-Updater)
+
+```bash
+# Clone the repo
+git clone https://github.com/biggux/plex-autoupdate.git
+cd plex-autoupdate
+
+# Run the interactive installer (as root)
+sudo bash install-plex-updater.sh
+```
+
+The installer will prompt you for:
+
+1. 🔑 Your **Plex token**
+2. 📡 **Update channel** — public (stable) or plexpass (beta)
+3. 📧 **Email notifications** — enable/disable and set recipient
+4. ⏱️ **Wait timeout** — how long to wait for active streams
+5. 📅 **Schedule** — how often to check for updates
+
+It installs the script to `/opt/plex-autoupdate/`, writes your config to `/etc/plex-autoupdate.conf`, and sets up the cron job with your chosen schedule.
+
+## 🛠️ Manual Setup (Auto-Updater)
+
+```bash
+# Copy files
+sudo mkdir -p /opt/plex-autoupdate
+sudo cp plex-autoupdate.sh /opt/plex-autoupdate/
+sudo chmod 755 /opt/plex-autoupdate/plex-autoupdate.sh
+
+# Create config
+sudo cp plex-autoupdate.conf /etc/plex-autoupdate.conf
+sudo chmod 600 /etc/plex-autoupdate.conf
+
+# Edit config with your values
+sudo nano /etc/plex-autoupdate.conf
+
+# Add to cron (example: daily at 2 AM)
+sudo crontab -e
+# Add: 0 2 * * * /opt/plex-autoupdate/plex-autoupdate.sh >> /var/log/plex-autoupdate.log 2>&1
+```
+
+## ⚙️ Auto-Updater Configuration
+
+All settings live in `/etc/plex-autoupdate.conf`:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `PLEX_TOKEN` | *(required)* | Your Plex authentication token |
+| `PLEX_URL` | `http://localhost:32400` | Plex server address |
+| `UPDATE_CHANNEL` | `public` | `public` for stable, `plexpass` for beta |
+| `MAX_WAIT_MINUTES` | `360` | Max time to wait for active streams (minutes) |
+| `CHECK_INTERVAL_SECONDS` | `120` | How often to re-check for streams while waiting |
+| `EMAIL_ENABLED` | `no` | `yes` to enable email notifications |
+| `EMAIL_TO` | *(empty)* | Recipient email address |
+| `EMAIL_FROM` | auto-detected | Sender address |
+| `EMAIL_SUBJECT_PREFIX` | `[Plex Updater]` | Email subject prefix |
+| `LOG_FILE` | `/var/log/plex-autoupdate.log` | Log file path |
+
+## 📅 Update Schedule Options
+
+The installer offers these preset schedules:
+
+| Option | Cron Expression | Description |
+| --- | --- | --- |
+| Daily (default) | `0 2 * * *` | Once per day at 2:00 AM |
+| Twice daily | `0 2,14 * * *` | At 2:00 AM and 2:00 PM |
+| Every 6 hours | `0 */6 * * *` | Four times per day |
+| Hourly | `0 * * * *` | Every hour on the hour |
+| Weekly | `0 2 * * 0` | Sunday at 2:00 AM |
+| Custom | *(you provide)* | Any valid cron expression |
+
+To change the schedule after installation:
+
+```bash
+sudo crontab -e
+```
+
+Or re-run the installer — it will detect and replace the existing cron entry.
+
+## 💻 Usage (Auto-Updater)
+
+```bash
+# Run manually with default config
+sudo /opt/plex-autoupdate/plex-autoupdate.sh
+
+# Run with a custom config file
+sudo /opt/plex-autoupdate/plex-autoupdate.sh --config /path/to/my.conf
+
+# Check logs
+tail -f /var/log/plex-autoupdate.log
+```
+
+## 📝 Example Log Output (Auto-Updater)
+
+```
+[2026-02-22 02:00:01] [INFO] ===== Plex Auto-Update Check Started [Channel: Public (stable)] =====
+[2026-02-22 02:00:01] [INFO] Installed version: 1.40.0.8227
+[2026-02-22 02:00:02] [INFO] Checking Public (stable) channel for updates...
+[2026-02-22 02:00:03] [INFO] Latest Public (stable) version: 1.41.0.8451
+[2026-02-22 02:00:03] [INFO] New version available: 1.41.0.8451 (current: 1.40.0.8227)
+[2026-02-22 02:00:08] [INFO] Downloaded to: /tmp/plex-update/plexmediaserver_1.41.0.8451_amd64.deb
+[2026-02-22 02:00:08] [INFO] Active sessions: 2. Waiting... (0s / 21600s)
+[2026-02-22 02:04:08] [INFO] No active sessions. Proceeding with update.
+[2026-02-22 02:04:13] [INFO] Plex stopped.
+[2026-02-22 02:04:18] [INFO] Installation successful.
+[2026-02-22 02:04:28] [INFO] Plex is running. Version: 1.41.0.8451
+[2026-02-22 02:04:28] [INFO] ===== Update complete: 1.40.0.8227 -> 1.41.0.8451 =====
+```
+
+---
+
+# 💾 Plex Backup
 
 Automated backup of Plex databases, preferences, and plugin data with stream-aware scheduling, configurable retention, and optional compression.
 
-## Features
+## ✨ Backup Features
 
-* **Configurable components** — back up databases, Preferences.xml, and/or plugin data
-* **Stream-aware** — waits for active viewers to finish before stopping Plex
-* **Safe shutdown** — stops Plex for consistent database copies, restarts automatically
-* **Compression** — optional gzip for smaller backup archives
-* **Retention policy** — automatically prune old backups
-* **Email notifications** — optional alerts on success, errors, or skipped backups
-* **Lock file** — prevents overlapping backup runs
+* 🧩 **Configurable components** — back up databases, Preferences.xml, and/or plugin data
+* 👀 **Stream-aware** — waits for active viewers to finish before stopping Plex
+* 🛡️ **Safe shutdown** — stops Plex for consistent database copies, restarts automatically
+* 📦 **Compression** — optional gzip for smaller backup archives
+* 🗑️ **Retention policy** — automatically prune old backups
+* 📧 **Email notifications** — optional alerts on success, errors, or skipped backups
+* 🔒 **Lock file** — prevents overlapping backup runs
 
-## How It Works
+## 🔧 How It Works
 
 ```
 ┌─────────────────────────────┐
@@ -50,7 +229,7 @@ Automated backup of Plex databases, preferences, and plugin data with stream-awa
 └─────────────────────────────┘
 ```
 
-## Quick Start
+## 🚀 Quick Start (Backup)
 
 ```bash
 # From the repo directory
@@ -59,15 +238,15 @@ sudo bash install-plex-backup.sh
 
 The installer will prompt you for:
 
-1. Your **Plex token**
-2. **Backup destination** — any local or mounted path
-3. **Components** — database, preferences, plugins
-4. **Retention** — how many backups to keep
-5. **Shutdown behavior** — stop Plex and/or wait for streams
-6. **Email notifications** — enable/disable and set recipient
-7. **Schedule** — how often to run backups
+1. 🔑 Your **Plex token**
+2. 📂 **Backup destination** — any local or mounted path
+3. 🧩 **Components** — database, preferences, plugins
+4. 🗑️ **Retention** — how many backups to keep
+5. 🛡️ **Shutdown behavior** — stop Plex and/or wait for streams
+6. 📧 **Email notifications** — enable/disable and set recipient
+7. 📅 **Schedule** — how often to run backups
 
-## Manual Setup
+## 🛠️ Manual Setup (Backup)
 
 ```bash
 # Copy files
@@ -86,7 +265,7 @@ sudo crontab -e
 # Add: 0 3 * * * /opt/plex-autoupdate/plex-backup.sh >> /var/log/plex-backup.log 2>&1
 ```
 
-## Backup Configuration
+## ⚙️ Backup Configuration
 
 All settings live in `/etc/plex-backup.conf`:
 
@@ -105,7 +284,7 @@ All settings live in `/etc/plex-backup.conf`:
 | `EMAIL_ENABLED` | `no` | Enable email alerts |
 | `LOG_FILE` | `/var/log/plex-backup.log` | Log file path |
 
-## Backup Schedule Options
+## 📅 Backup Schedule Options
 
 | Option | Cron Expression | Description |
 | --- | --- | --- |
@@ -115,7 +294,7 @@ All settings live in `/etc/plex-backup.conf`:
 | Weekly | `0 3 * * 0` | Sunday at 3:00 AM |
 | Custom | *(you provide)* | Any valid cron expression |
 
-## Usage
+## 💻 Usage (Backup)
 
 ```bash
 # Run manually
@@ -128,7 +307,7 @@ sudo /opt/plex-autoupdate/plex-backup.sh --config /path/to/my.conf
 tail -f /var/log/plex-backup.log
 ```
 
-## Example Log Output
+## 📝 Example Log Output (Backup)
 
 ```
 [2026-02-23 03:00:01] [INFO] ===== Plex Backup Started =====
@@ -151,3 +330,37 @@ tail -f /var/log/plex-backup.log
 [2026-02-23 03:00:45] [INFO] Backup complete: plex-backup-20260223-030001.tar.gz (2.1G)
 [2026-02-23 03:00:45] [INFO] ===== Plex Backup Finished Successfully =====
 ```
+
+---
+
+## 📧 Email Notifications
+
+Both tools support email notifications. When enabled, you'll receive emails for:
+
+**🔄 Auto-Updater:**
+* ✅ New version detected (with version numbers)
+* ✅ Update completed successfully
+* ⏸️ Update postponed (streams still active after timeout)
+* ❌ Errors (download failures, install failures, Plex won't start)
+
+**💾 Backup:**
+* ✅ Backup completed successfully (with file size)
+* ⏸️ Backup skipped (streams still active after timeout)
+* ❌ Backup completed with errors
+
+Requires `mailutils` or `sendmail`:
+
+```bash
+sudo apt install mailutils
+```
+
+## 📄 Logs
+
+Both tools log with timestamps to separate files:
+
+* **🔄 Auto-Updater:** `/var/log/plex-autoupdate.log`
+* **💾 Backup:** `/var/log/plex-backup.log`
+
+## 📜 License
+
+MIT
