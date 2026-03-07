@@ -60,11 +60,12 @@ cleanup() {
 get_active_sessions() {
     local count
     count=$(curl -sf -H "X-Plex-Token: $PLEX_TOKEN" \
+        -H "Accept: application/json" \
         "$PLEX_URL/status/sessions" 2>/dev/null \
         | python3 -c "
-import sys, xml.etree.ElementTree as ET
-tree = ET.parse(sys.stdin)
-print(tree.getroot().attrib.get('size', '0'))
+import sys, json
+data = json.load(sys.stdin)
+print(data.get('MediaContainer', {}).get('size', 0))
 " 2>/dev/null) || count="0"
     echo "$count"
 }
@@ -267,7 +268,7 @@ if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
 else
     echo "Config file not found: $CONFIG_FILE"
-    echo "Run install-plex-backup.sh or copy plex-backup.conf to /etc/plex-backup.conf"
+    echo "Run install.sh or copy plex-backup.conf to /etc/plex-backup.conf"
     exit 1
 fi
 

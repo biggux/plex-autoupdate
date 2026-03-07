@@ -43,7 +43,7 @@ prompt() {
         read -rp "$prompt_text: " value
     fi
 
-    eval "$var_name=\"$value\""
+    printf -v "$var_name" '%s' "$value"
 }
 
 prompt_yn() {
@@ -61,7 +61,7 @@ prompt_yn() {
         n) value="no" ;;
     esac
 
-    eval "$var_name=\"$value\""
+    printf -v "$var_name" '%s' "$value"
 }
 
 validate_token() {
@@ -184,7 +184,7 @@ select_schedule() {
     case "$choice" in
         2) CRON_EXPR="0 ${default_hour},$((default_hour+12)) * * *"
            CRON_DESC="Twice daily" ;;
-        3) CRON_EXPR="0 */${default_hour} * * *"
+        3) CRON_EXPR="0 */6 * * *"
            CRON_DESC="Every 6 hours" ;;
         4) CRON_EXPR="0 ${default_hour} * * 0"
            CRON_DESC="Weekly (Sunday ${default_hour}:00 AM)" ;;
